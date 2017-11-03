@@ -1,0 +1,10 @@
+<div class="search-container">
+    <p>Enter Character Name</p>
+    <input #characterName (keyup.enter)="onEnter(characterName.value)">
+    <button (click)="onEnter(characterName.value)">Search</button>
+    <form>
+        <input type="radio" value="2" name="platform" #platform (change)="membershipId(platform.value)" checked> PS4<br>
+        <input type="radio" value="1" name="platform" #platform2 (change)="membershipId(platform2.value)" > Xbox One
+    </form>
+    <p>{{output}}</p>
+</div>

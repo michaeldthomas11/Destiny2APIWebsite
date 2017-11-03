@@ -1,0 +1,10 @@
+<div class="reddit-container">
+  <h1>{{redditWidgetTitle}}</h1>
+  <ul>
+	<li *ngFor="let post of messages">
+		<a target="_blank" href='{{post.url}}'>
+			<p>{{post.title}}<br>By {{post.author}}<br>Posted Date: {{post.time}}</p>
+		</a>
+	</li>
+  </ul>
+</div>

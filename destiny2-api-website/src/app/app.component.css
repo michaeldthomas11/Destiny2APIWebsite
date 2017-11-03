@@ -1,0 +1,32 @@
+:host h1 {
+  color: white;
+  text-align:center;
+}
+:host .forumWidget {
+	width: 30%;
+    vertical-align: top;
+    display: inline-block;
+}
+:host .redditWidget {
+    vertical-align: top;
+	width: 30%;
+    display: inline-block;
+}
+:host .searchWidget {
+    vertical-align: top;
+    width: 39%;
+    display: inline-block;
+    text-align: center;
+}
+:host .app {
+    height: 100%;
+	width: 100%;
+	max-height: 100%;
+	margin: 0;
+	padding: 0;
+	background-image: url('../assets/destiny2background.jpg');
+	background-repeat: no-repeat;
+    background-size: cover;
+	background-attachment: fixed;
+	position: absolute;
+}

@@ -1,0 +1,26 @@
+:host h1 {
+  color: white;
+  text-align: center;
+}
+:host p {
+  color: magenta;
+  padding: 10px;
+}
+:host ul {
+  border: 3px solid magenta;
+  padding: 10px;
+  text-align: left;
+  background-color: rgba(000,000,000,0.7);
+}
+:host li {
+	border: 1px solid magenta;
+	list-style: none;
+}
+
+:host .author {
+	margin-right: 10px;
+}
+
+:host forum-container {
+    display: inline-block;
+}

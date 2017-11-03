@@ -1,0 +1,1235 @@
+[
+    {
+        "id": "6df780be.66405",
+        "type": "Parameters",
+        "z": "345530a.12467d",
+        "name": "Violations in Compliance ",
+        "parameters": "[\n    {\n        \"type\": \"filterDropdown\",\n        \"title\": \"filter\",\n        \"required\": true,\n        \"inheritable\": true\n    },\n    {\n        \"type\": \"targetBuildDropdown\",\n        \"title\": \"Target_Build\",\n        \"required\": true,\n        \"inheritable\": true\n    },\n    { \"type\": \"dropdown\", \n      \"title\": \"Compliance\", \n      \"name\": \"requiredRuleGroupSetId\", \n      \"required\": true, \n      \"apiParameter\": \"complianceId\" \n    }\n]",
+        "labels": "[\n    {\n        \"name\": \"filter\",\n        \"value\": \"filter\"\n    },\n    {\n        \"name\": \"Target_Build\",\n        \"value\": \"targetBuild\"\n    },\n    {\n        \"name\": \"Compliance\",\n        \"value\": \"requiredRuleGroupSetId\"\n    }\n]",
+        "x": 170,
+        "y": 100,
+        "wires": []
+    },
+    {
+        "id": "789ec116.8f081",
+        "type": "Endpoint",
+        "z": "345530a.12467d",
+        "name": "Violations in Compliance  - Pie",
+        "uuid": "b9326829-7b67-4154-9946-a24fcc4ccd4b",
+        "endpointType": "widget",
+        "category": "compliance10",
+        "sizeX": "2",
+        "sizeY": 1,
+        "scope": [
+            "a89f313f.7f9dc",
+            "6df780be.66405"
+        ],
+        "description": "This widget shows the overall compliance status as a percentage. Each pie chart segment represents a compliance category that the code violates. The widget also shows the total number of compliance categories being applied and the number of categories with which the code is compliant.",
+        "x": 180,
+        "y": 180,
+        "wires": [
+            [
+                "c26ccd6c.4bb39"
+            ]
+        ]
+    },
+    {
+        "id": "8787a500.00c068",
+        "type": "http response",
+        "z": "345530a.12467d",
+        "name": "",
+        "x": 910,
+        "y": 500,
+        "wires": []
+    },
+    {
+        "id": "64214317.cef59c",
+        "type": "function",
+        "z": "345530a.12467d",
+        "name": "Find build",
+        "func": "var _ = context.global.lodash;\n\nvar builds = msg.builds.builds;\n\n// Find the build.\nvar targetBuild = msg.payload.targetBuild;\nif (targetBuild === 'latestBuild') {\n    // Find the first build that meets the build criteria.\n    msg.target = _.find(builds, msg.buildCriteria);\n} else {\n    msg.target = _.find(builds, _.extend({id: targetBuild}, msg.buildCriteria));\n}\n\n// Check to see if the build does not exist.\nif (_.isUndefined(msg.target)) {\n    if (targetBuild === 'latestBuild') {\n        var message = msg.req.i18n.t('gb_no_build_relevant_data', {\n            filterName: msg.filter.name\n        });\n    } else {\n    var message = msg.req.i18n.t('gb_build_does_not_exist', {\n        buildId: targetBuild,\n        filterName: msg.filter.name\n    });\n}\n    msg.payload = {\n        error: {\n            title: msg.req.i18n.t('gb_invalid_query_param_title', {}),\n            message: message\n        }\n    };\n    msg.statusCode = 400;\n    return node.error(message, msg);\n}\n\nmsg.target.encodedId = encodeURIComponent(msg.target.id);\n\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "x": 900,
+        "y": 380,
+        "wires": [
+            [
+                "3c9d08fe.c8baa8"
+            ]
+        ]
+    },
+    {
+        "id": "eb62f3e1.b6746",
+        "type": "DTP REST API",
+        "z": "345530a.12467d",
+        "name": "Get filter",
+        "requestType": "GET",
+        "endpoint": "/v1.2/filters?filterId={{payload.filterId}}",
+        "input": "payload",
+        "output": "filters",
+        "x": 180,
+        "y": 380,
+        "wires": [
+            [
+                "97900ddf.90c95"
+            ]
+        ]
+    },
+    {
+        "id": "97900ddf.90c95",
+        "type": "function",
+        "z": "345530a.12467d",
+        "name": "Ensure filter exists",
+        "func": "var _ = context.global.lodash;\n\n// Check to see if no filters matched the filterId.\nif (_.isEmpty(msg.filters)) {\n    var message = msg.req.i18n.t('gb_filter_does_not_exist', msg.payload);\n    msg.payload = {\n        error: {\n            title: msg.req.i18n.t('gb_invalid_query_param_title', {}),\n            message: message\n        }\n    };\n    msg.statusCode = 400;\n    return node.error(message, msg);\n}\n\nmsg.filter = msg.filters.filters[0];\n\nreturn msg;",
+        "outputs": "1",
+        "noerr": 0,
+        "x": 350,
+        "y": 380,
+        "wires": [
+            [
+                "75535581.6a3c9c"
+            ]
+        ]
+    },
+    {
+        "id": "b4dd2406.563ba8",
+        "type": "function",
+        "z": "345530a.12467d",
+        "name": "Check for missing parameters",
+        "func": "var _ = context.global.lodash;\n\nif (msg.mode === 'report') {\n    if (!_.isUndefined(msg.payload.targetBuildId)) {\n        msg.payload.targetBuild = msg.payload.targetBuildId;\n        delete msg.payload.targetBuildId; // Remove from payload since we don't need it\n    }\n}\n\n// Check for a missing filterId.\nif (_.isUndefined(msg.payload.filterId)) {\n    var message = msg.req.i18n.t('gb_missing_query_param', {param: 'filterId'});\n    msg.payload = {\n        error: {\n            title: msg.req.i18n.t('gb_missing_query_param_title', {}),\n            message: message\n        }\n    };\n    msg.statusCode = 400;\n    return node.error(message, msg);\n}\n\n// Check for a missing targetBuild.\nif (_.isUndefined(msg.payload.targetBuild)) {\n    var message = msg.req.i18n.t('gb_missing_query_param', {param: 'targetBuild'});\n    msg.payload = {\n        error: {\n            title: msg.req.i18n.t('gb_missing_query_param_title', {}),\n            message: message\n        }\n    };\n    msg.statusCode = 400;\n    return node.error(message, msg);\n}\n\n// Check for missing requiredRuleGroupSetId\nif (_.isUndefined(msg.payload.requiredRuleGroupSetId)) {\n    var message = msg.req.i18n.t('gb_missing_query_param', {param: 'requiredRuleGroupSetId'});\n    msg.payload = {\n        error: {\n            title: msg.req.i18n.t('gb_missing_query_param_title', {}),\n            message: message\n        }\n    };\n    msg.statusCode = 400;\n    return node.error(message, msg);\n}\n\n// Format build id if build information is coming from a widget\nif (msg.mode === 'widget') {\n    // If the targetBuild begins with 'buildId:', strip it out\n    if (_.startsWith(msg.payload.targetBuild, \"buildId:\")) {\n        msg.payload.targetBuild = msg.payload.targetBuild.substring(8);\n    }\n}\n\nreturn msg;",
+        "outputs": "1",
+        "noerr": 0,
+        "x": 710,
+        "y": 220,
+        "wires": [
+            [
+                "eb62f3e1.b6746"
+            ]
+        ]
+    },
+    {
+        "id": "fb2b31c4.36979",
+        "type": "i18n",
+        "z": "345530a.12467d",
+        "name": "Get Build Localization",
+        "property": "payload",
+        "rules": [
+            {
+                "v": "gb_missing_query_param_title",
+                "v2": "Missing query parameter",
+                "v3": "不足しているクエリー パラメーター",
+                "v4": ""
+            },
+            {
+                "v": "gb_missing_query_param",
+                "v2": "The __param__ query parameter is required.",
+                "v3": "__param__ クエリー パラメーターが必要です。",
+                "v4": ""
+            },
+            {
+                "v": "gb_invalid_query_param_title",
+                "v2": "Invalid query parameter",
+                "v3": "不正なクエリー パラメーター",
+                "v4": ""
+            },
+            {
+                "v": "gb_filter_does_not_exist",
+                "v2": "Filter with ID '__filterId__' does not exist",
+                "v3": "ID '__filterId__' のフィルターは存在しません",
+                "v4": ""
+            },
+            {
+                "v": "gb_build_does_not_exist",
+                "v2": "Build '__buildId__' does not have relevant data, or does not exist in filter '__filterName__'",
+                "v3": "ビルド '__buildId__' は関連データがないか、あるいはフィルター '__filterName__' 中に存在しません。",
+                "v4": ""
+            },
+            {
+                "v": "gb_no_build_relevant_data",
+                "v2": "No build was found with relevant data in filter '__filterName__'",
+                "v3": "",
+                "v4": ""
+            }
+        ],
+        "lang1": "en-US",
+        "lang2": "ja",
+        "lang3": "",
+        "x": 420,
+        "y": 100,
+        "wires": []
+    },
+    {
+        "id": "b3dabf2e.c5063",
+        "type": "function",
+        "z": "345530a.12467d",
+        "name": "Set build criteria",
+        "func": "// Here you can set the criteria that the build must have.\n// By default there is no criteria, but if you wanted to limit\n// the selected build to only builds with coverage data you could\n// set the build criteria as follows:\n// {runTypes: {coverage: {hasDetails: true}}}\nmsg.buildCriteria = {runTypes: {staticAnalysis: {}}};\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "x": 740,
+        "y": 380,
+        "wires": [
+            [
+                "64214317.cef59c"
+            ]
+        ]
+    },
+    {
+        "id": "75535581.6a3c9c",
+        "type": "DTP REST API",
+        "z": "345530a.12467d",
+        "name": "Get builds for filter",
+        "requestType": "GET",
+        "endpoint": "/v1.2/builds?filterId={{filter.id}}&buildFields=*",
+        "input": "payload",
+        "output": "builds",
+        "x": 550,
+        "y": 380,
+        "wires": [
+            [
+                "b3dabf2e.c5063"
+            ]
+        ]
+    },
+    {
+        "id": "3c9d08fe.c8baa8",
+        "type": "DTP REST API",
+        "z": "345530a.12467d",
+        "name": "Get Compliance Details",
+        "requestType": "GET",
+        "endpoint": "/v1/rules/ruleGroupSets/{{payload.requiredRuleGroupSetId}}/ruleGroups",
+        "input": "payload",
+        "output": "categoryDetails",
+        "x": 230,
+        "y": 440,
+        "wires": [
+            [
+                "63d324c9.4413dc"
+            ]
+        ]
+    },
+    {
+        "id": "63d324c9.4413dc",
+        "type": "DTP REST API",
+        "z": "345530a.12467d",
+        "name": "Violation Count by Rule",
+        "requestType": "GET",
+        "endpoint": "/v1.5/staticAnalysisViolations/count?buildId={{target.encodedId}}&filterId={{payload.filterId}}&groupBy=rule",
+        "input": "payload",
+        "output": "violationCountByRule",
+        "x": 470,
+        "y": 440,
+        "wires": [
+            [
+                "42dd3462.47c68c"
+            ]
+        ]
+    },
+    {
+        "id": "e8d38f87.7f0d1",
+        "type": "function",
+        "z": "345530a.12467d",
+        "name": "Map violations counts by category for Pie",
+        "func": "var _ = context.global.lodash;\n\nvar violationTotalCount = 0; // Violation total for rules for this compliance\nvar totalCategories = msg.categoryDetails.length;\nvar numCategoriesNoViolations = 0;\nvar drilldownUrl = \"/grs/reports/drilldown/violationsByRuleCategoryReport.jsp?filterId=\" + msg.payload.filterId + \"&filterName=\" + encodeURIComponent(msg.payload.filterName) + \"&buildId=\" + msg.target.encodedId + \"&ruleGroupSetId=\" + msg.payload.requiredRuleGroupSetId;\n\nvar pieChart = {\n    tooltip: \"#= dataItem.category # - #=dataItem.value # \" + msg.req.i18n.t('comp_violations'),\n    data: []\n};\n\nfunction mapViolationCount(violationCount) {\n    var map = {};\n    if (violationCount.hasData) {\n        _.each(violationCount.groupBy.groups, function (group) {\n            map[group.rule.id] = group.failed || 0;\n        });\n    }\n    return map;\n}\n\nvar violations = mapViolationCount(msg.violationCountByRule);\n\n_.each(msg.categoryDetails, function(category) {\n    //find count for each rule and combine them as value for the category.\n    var count = 0;\n    var drilldown = '/grs/reports/drilldown/violationsByRuleReport.jsp?filterId=' + msg.payload.filterId +\n '&filterName=' + encodeURIComponent(msg.payload.filterName) +\n                '&buildId=' + msg.target.encodedId +\n        '&ruleGroupSetId=' + msg.payload.requiredRuleGroupSetId +\n        '&ruleGroup=' + category.id + '&ruleGroupLabel=' + encodeURIComponent(category.name);\n\n    _.each(category.ruleIds, function(ruleId) {\n        count += violations[ruleId] || 0;\n    });\n    violationTotalCount += count;\n    if (count === 0) {\n        numCategoriesNoViolations += 1;\n    }\n    var categoryCount = {category: category.name, value: count, drilldownUrl: drilldown, color: category.color};\n    pieChart.data.push(categoryCount);\n});\n\nif (violationTotalCount === 0) {\n    pieChart =\n    {\n        data: [\n            {\n                category: \"No Violations\",\n                value: 1,\n                color: \"#DDDDDD\"\n            }\n        ],\n        tooltip: \"#= dataItem.category #\"\n    };\n}\n\n// Sort from highest violation count to lowest\npieChart.data.sort(function(a, b) {\n    return b.value - a.value;\n});\n\nmsg.payload = {\n    tooltip: pieChart.tooltip,\n    data: pieChart.data,\n    drilldownUrl: drilldownUrl,\n    violationTotalCount: violationTotalCount,\n    totalCategoriesLabel: msg.req.i18n.t('comp_total_categories_label'),\n    numCategoriesNoViolationsLabel: msg.req.i18n.t('comp_total_no_viol_label'),\n    totalCategories: totalCategories,\n    numCategoriesNoViolations: numCategoriesNoViolations\n};\n\ndelete msg.categoryDetails;\ndelete msg.violationCountByRule;\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "x": 580,
+        "y": 500,
+        "wires": [
+            [
+                "8787a500.00c068"
+            ]
+        ]
+    },
+    {
+        "id": "cd083c97.9d6a6",
+        "type": "i18n",
+        "z": "345530a.12467d",
+        "name": "Compliance Localization",
+        "property": "payload",
+        "rules": [
+            {
+                "v": "comp_pie_no_violations",
+                "v2": "There are no violations reported for the selected compliance",
+                "v3": "",
+                "v4": ""
+            },
+            {
+                "v": "comp_pie_no_violations_title",
+                "v2": "No Violations from the Compliance",
+                "v3": "",
+                "v4": ""
+            },
+            {
+                "v": "compliance_unknown_widget",
+                "v2": "Widget is deployed incorrectly. This error shouldn't be reached.",
+                "v3": "",
+                "v4": ""
+            },
+            {
+                "v": "comp_tree_no_violations",
+                "v2": "No Violations",
+                "v3": "",
+                "v4": ""
+            },
+            {
+                "v": "compliance_label",
+                "v2": "Compliance: __comp__",
+                "v3": "",
+                "v4": ""
+            },
+            {
+                "v": "comp_total_no_viol_label",
+                "v2": "Categories without Violations",
+                "v3": "",
+                "v4": ""
+            },
+            {
+                "v": "comp_total_categories_label",
+                "v2": "Total Categories",
+                "v3": "",
+                "v4": ""
+            },
+            {
+                "v": "comp_violations",
+                "v2": "Violation(s)",
+                "v3": "",
+                "v4": ""
+            },
+            {
+                "v": "comp_groupby",
+                "v2": "Group By:",
+                "v3": "",
+                "v4": ""
+            }
+        ],
+        "lang1": "en-US",
+        "lang2": "",
+        "lang3": "",
+        "x": 650,
+        "y": 100,
+        "wires": []
+    },
+    {
+        "id": "9a075fb0.0e59",
+        "type": "Component",
+        "z": "345530a.12467d",
+        "name": "Violations in Compliance - Treemap",
+        "template": "<kendo-tooltip class=\"treemap-widget-tooltip\" k-options=\"tooltipOptions\">\n    <kendo-treemap class=\"treemap-widget\" k-options=\"treeMapOptions\" k-rebind=\"treeMapOptions.dataSource\"></kendo-treemap>\n</kendo-tooltip>",
+        "controller": "if(data.tooltip) {\n     $scope.tooltipTemplate= kendo.template(data.tooltip);\n}\n\n$scope.tooltipOptions = {\n    filter: '.k-treemap-title,.k-treemap-title-vertical,.k-leaf',\n    position: 'top',\n    callout: false,\n    animation: false,\n    content: function (e) {\n        var dataItem = $scope.treeMap.dataItem(e.target.closest('.k-treemap-tile'));\n        if($scope.tooltipTemplate) {\n            return $scope.tooltipTemplate({ dataItem: dataItem });\n        }\n        return e.target.text();\n    }\n};\n\nvar optionalSchema = data.config ? data.config.schema : \"items\";\n$scope.treeMapOptions = {\n    dataSource: {\n        data: data.config ? data[data.config.schema] : data.items,\n        schema: {\n            model: {\n                children: optionalSchema\n            }\n        }\n    },\n    template: kendo.template(data.template),\n    valueField: !data.config ? 'value' : data.config.valueField ? data.config.valueField : 'value',\n    textField: !data.config ? 'name' : data.config.textField ? data.config.textField : 'name',\n    colorField: 'color',\n    type: !data.config ? 'squarified' : data.config.type ? data.config.type : 'squarified',\n    itemCreated: function (e) {\n        var dataItem = e.sender.dataItem(e.element);\n        if (_.isUndefined(dataItem[optionalSchema])) {\n            e.element.css('cursor', 'pointer');\n            e.element.click(function () {\n                $window.open(dataItem.drilldownUrl);\n            });\n        }\n    },\n    dataBound: function (e) {\n        $scope.treeMap = e.sender;\n        if (e.node) {\n            var element = $scope.treeMap.findByUid(e.node.uid);\n            element.css('background-color', e.node.color);\n        }\n    }\n};",
+        "styles": ".treemap-widget-tooltip, .treemap-widget {\n    width: 100%;\n    height: 100%;\n}\n\n.k-grid td {\n    padding-top: 0em;\n    padding-right: 0.6em;\n    padding-left: 0.6em;\n    padding-bottom: 0em;\n    overflow: hidden;\n    text-overflow: ellipsis;\n    white-space: nowrap;\n}",
+        "x": 200,
+        "y": 240,
+        "wires": []
+    },
+    {
+        "id": "917ca173.5e77e",
+        "type": "Endpoint",
+        "z": "345530a.12467d",
+        "name": "Violations in Compliance  - Treemap",
+        "uuid": "704fde8b-e8e8-46be-9004-e292791d9f48",
+        "endpointType": "widget",
+        "category": "compliance10",
+        "sizeX": "3",
+        "sizeY": "3",
+        "scope": [
+            "9a075fb0.0e59",
+            "a02e66e1.6a1268"
+        ],
+        "description": "This widget shows the violations grouped by compliance in a tree map. Each tile is assigned a color and represents a compliance category.",
+        "x": 200,
+        "y": 280,
+        "wires": [
+            [
+                "1303c04b.33c68"
+            ]
+        ]
+    },
+    {
+        "id": "c26ccd6c.4bb39",
+        "type": "change",
+        "z": "345530a.12467d",
+        "name": "Set Pie Widget",
+        "rules": [
+            {
+                "t": "set",
+                "p": "reportmode",
+                "pt": "msg",
+                "to": "pie",
+                "tot": "str"
+            },
+            {
+                "t": "set",
+                "p": "mode",
+                "pt": "msg",
+                "to": "widget",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 440,
+        "y": 180,
+        "wires": [
+            [
+                "b4dd2406.563ba8"
+            ]
+        ]
+    },
+    {
+        "id": "1303c04b.33c68",
+        "type": "change",
+        "z": "345530a.12467d",
+        "name": "Set Treemap Widget",
+        "rules": [
+            {
+                "t": "set",
+                "p": "reportmode",
+                "pt": "msg",
+                "to": "treemap",
+                "tot": "str"
+            },
+            {
+                "t": "set",
+                "p": "mode",
+                "pt": "msg",
+                "to": "widget",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 460,
+        "y": 280,
+        "wires": [
+            [
+                "b4dd2406.563ba8"
+            ]
+        ]
+    },
+    {
+        "id": "713019c8.6806e8",
+        "type": "switch",
+        "z": "345530a.12467d",
+        "name": "Switch Widget Calculation",
+        "property": "reportmode",
+        "propertyType": "msg",
+        "rules": [
+            {
+                "t": "eq",
+                "v": "pie",
+                "vt": "str"
+            },
+            {
+                "t": "eq",
+                "v": "treemap",
+                "vt": "str"
+            },
+            {
+                "t": "else"
+            }
+        ],
+        "checkall": "true",
+        "outputs": 3,
+        "x": 230,
+        "y": 500,
+        "wires": [
+            [
+                "e8d38f87.7f0d1"
+            ],
+            [
+                "91fdd84d.0f9dc8"
+            ],
+            [
+                "613309b4.ca61b8"
+            ]
+        ]
+    },
+    {
+        "id": "91fdd84d.0f9dc8",
+        "type": "function",
+        "z": "345530a.12467d",
+        "name": "Map violations counts by category for Treemap",
+        "func": "var _ = context.global.lodash;\n\nvar compliance = _.find(msg.complianceList, {'id': msg.payload.requiredRuleGroupSetId});\n\nvar treemapChart = { \n    tooltip: \"<div>#= dataItem.description ? dataItem.description : dataItem.name #</div><div>#= dataItem.value # \" + msg.req.i18n.t('comp_violations') + \"</div>\",\n    template: \"{{dataItem.name}}\",\n    items: [{name: compliance.name, value: 0, items: []}]\n};\n\nvar mapViolationCount = function (violationCount) {\n    var map = {};\n    if (violationCount.hasData) {\n        _.each(violationCount.groupBy.groups, function (group) {\n            map[group.rule.id] = {\n                failed: group.failed || 0,\n                description: group.rule.description\n            };\n        });\n    }\n    return map;\n};\n\nvar violations = mapViolationCount(msg.violationCountByRule);\n\nvar totalCount = 0;\n\n_.each(msg.categoryDetails, function(category) {\n    \n    var categoryItem = {\n        items: [],\n        name: category.name,\n        value: 0\n    };\n\n    //find count for each rule and combine them as value for the category.\n    var count = 0;\n\n    _.each(category.ruleIds, function(ruleId) {\n        var noVios  = violations[ruleId] ? violations[ruleId].failed : 0;\n        if (noVios > 0) {\n            count += noVios;\n            var drilldownUrl = msg.services.services.violationsExplorer + \n                '?filterId=' + msg.payload.filterId + \n                '&buildId=' + msg.target.encodedId + \n                '&rule=' + ruleId;\n            var ruleItem = {\n                name: ruleId,\n                value: noVios,\n                description: violations[ruleId].description,\n                drilldownUrl: drilldownUrl,\n                color: category.color\n            };\n            categoryItem.items.push(ruleItem);\n        }    \n    });\n    if (count > 0) {\n        totalCount += count;\n        categoryItem.value = count;\n        treemapChart.items[0].items.push(categoryItem);\n    }\n});\n\nif (totalCount === 0) {\n    var message = msg.req.i18n.t('compliance_label', {comp: compliance.name});\n    msg.payload = {\n        error: {\n            title: msg.req.i18n.t('comp_tree_no_violations'),\n            message: message\n        }\n    };\n    msg.statusCode = 400;\n    return node.error(message, msg);\n}\n\ntreemapChart.items[0].value = totalCount;\n\nmsg.payload = treemapChart;\n\nmsg.categoryDetails = {};\nmsg.violationCountByRule = {};\nmsg.services = {};\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "x": 600,
+        "y": 540,
+        "wires": [
+            [
+                "8787a500.00c068"
+            ]
+        ]
+    },
+    {
+        "id": "43b043e.360b0bc",
+        "type": "DTP REST API",
+        "z": "345530a.12467d",
+        "name": "Services",
+        "requestType": "GET",
+        "endpoint": "/v1.5/services?relativePath=true",
+        "input": "payload",
+        "output": "services",
+        "x": 860,
+        "y": 440,
+        "wires": [
+            [
+                "f1d80805.1e3198"
+            ]
+        ]
+    },
+    {
+        "id": "42dd3462.47c68c",
+        "type": "DTP REST API",
+        "z": "345530a.12467d",
+        "name": "Get compliance list",
+        "requestType": "GET",
+        "endpoint": "/v1/dashboard/parameters/compliance",
+        "input": "payload",
+        "output": "complianceList",
+        "x": 690,
+        "y": 440,
+        "wires": [
+            [
+                "43b043e.360b0bc"
+            ]
+        ]
+    },
+    {
+        "id": "613309b4.ca61b8",
+        "type": "function",
+        "z": "345530a.12467d",
+        "name": "Error invalid Report mode",
+        "func": "msg.payload = {\n    error: {\n        title: msg.req.i18n.t('compliance_unknown_widget', {}),\n        message: message\n    }\n};\nmsg.statusCode = 400;\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "x": 530,
+        "y": 580,
+        "wires": [
+            [
+                "8787a500.00c068"
+            ]
+        ]
+    },
+    {
+        "id": "d6bd9d97.8627a",
+        "type": "catch",
+        "z": "345530a.12467d",
+        "name": "",
+        "scope": null,
+        "x": 420,
+        "y": 1260,
+        "wires": [
+            [
+                "b4ebb9e4.6b0fa8"
+            ]
+        ]
+    },
+    {
+        "id": "e0638ace.8e3be8",
+        "type": "http response",
+        "z": "345530a.12467d",
+        "name": "",
+        "x": 810,
+        "y": 1260,
+        "wires": []
+    },
+    {
+        "id": "a89f313f.7f9dc",
+        "type": "Component",
+        "z": "345530a.12467d",
+        "name": "Violations in Compliance  - Pie",
+        "template": "<div class=\"vc-pie-chart-widget\">\n    <div class=\"vc-pie-chart-container\">\n        <div kendo-chart class=\"vc-pie-chart\"\n            k-series=\"series\"\n            k-options=\"options\"\n            k-data-source=\"dataSource\"\n            k-series-defaults=\"seriesDefaults\"\n            k-rebind=\"dataSource\" ></div>\n    </div>\n    <div class=\"vc-compliance-details\">\n        <a class=\"vc-drilldown\" href=\"{{data.drilldownUrl}}\" target=\"_blank\">\n        <div class=\"percentage-info\">\n            {{ data.numCategoriesNoViolations | ratio:data.totalCategories | ratioToPercent:0 }}%\n        </div>\n        </a>\n        <div class=\"category-violation-info\">\n            <div class=\"categories-no-viol-label\">{{data.numCategoriesNoViolationsLabel}}: {{data.numCategoriesNoViolations}}</div>\n            <div class=\"total-categories-label\">{{data.totalCategoriesLabel}}: {{data.totalCategories}}</div>\n        </div>\n    </div>\n</div>",
+        "controller": "$scope.seriesDefaults = { \n    type: 'pie' \n};\n\n$scope.dataSource = data.data;\n$scope.data = data;\n\n$scope.series = [{\n    padding: 0,\n    field: 'value', \n    categoryField: 'category',\n    overlay: {gradient: 'none'},\n    tooltip: {visible: !!data.tooltip, template: data.tooltip}\n}];\n\n$scope.options = {\n    chartArea: {padding: 0, margin: 5},\n    plotArea: {padding: 0, margin: 0},\n    title: {padding: 0, margin: 0},\n    legend: {visible: false},\n    seriesColors: data.colors,\n    seriesClick: function(e) {\n        var url = e.dataItem.drilldownUrl;\n        if (url) {\n            $window.open(url, '_blank');\n        }\n    }\n};",
+        "styles": ".vc-pie-chart-widget {\n    width: 100%;\n    height: 100%;\n}\n\n.vc-pie-chart {\n    margin-top: 8px;\n    width: 125px;\n    height: 125px;\n}\n\n.vc-pie-chart-container {\n    display: inline-block;\n    margin-left: 25px;\n    margin-bottom: 15px;\n    position: relative;\n    width: 125px;\n    height: 150px;\n}\n\n.vc-compliance-details {\n    position: absolute;\n    display: inline-block;\n    margin: 0 auto;\n    margin-top: 15px;\n    width: 60%;\n}\n\n.categories-no-viol-label, .total-categories-label {\n    display: block;\n    text-align: center;\n    font-size: 14px;\n}\n\n.percentage-info {\n    text-align: center;\n    font-size: 35px;\n}\n\n.vc-drilldown {\n    color: inherit !important;\n    text-decoration: none !important;\n}",
+        "x": 180,
+        "y": 140,
+        "wires": []
+    },
+    {
+        "id": "b4ebb9e4.6b0fa8",
+        "type": "switch",
+        "z": "345530a.12467d",
+        "name": "If not http response",
+        "property": "error.source.type",
+        "propertyType": "msg",
+        "rules": [
+            {
+                "t": "neq",
+                "v": "http response",
+                "vt": "str"
+            }
+        ],
+        "checkall": "true",
+        "outputs": 1,
+        "x": 630,
+        "y": 1260,
+        "wires": [
+            [
+                "e0638ace.8e3be8"
+            ]
+        ]
+    },
+    {
+        "id": "a02e66e1.6a1268",
+        "type": "Parameters",
+        "z": "345530a.12467d",
+        "name": "Violations in Compliance - TreeMap",
+        "parameters": "[\n    {\n        \"type\": \"filterDropdown\",\n        \"title\": \"filter\",\n        \"required\": true,\n        \"inheritable\": true\n    },\n    {\n        \"type\": \"targetBuildDropdown\",\n        \"title\": \"Target_Build\",\n        \"required\": true,\n        \"inheritable\": true\n    },\n    { \n      \"type\": \"dropdown\", \n      \"title\": \"Compliance\", \n      \"name\": \"requiredRuleGroupSetId\", \n      \"required\": true, \n      \"apiParameter\": \"complianceId\" \n    }\n]",
+        "labels": "[\n    {\n        \"name\": \"filter\",\n        \"value\": \"filter\"\n    },\n    {\n        \"name\": \"Target_Build\",\n        \"value\": \"targetBuild\"\n    }\n]",
+        "x": 198,
+        "y": 321.8000030517578,
+        "wires": []
+    },
+    {
+        "id": "15640a2e.a5f946",
+        "type": "comment",
+        "z": "345530a.12467d",
+        "name": "${project.name} ${artifact.version}",
+        "info": "${project.description}\n\n## Version ${artifact.version}\n\n## Available Widget\n* `Compliance` > `Violations in Compliance - Pie`\n* `Compliance` > `Violations in Compliance - Treemap`\n* `Compliance` > `Compliance Violations by Metadata`\n\n## Required Parameters:\n* `filterId`: FilterID that widget uses to generate chart\n* `buildId`: BuildID that widget uses to generate chart\n* `compliance`: Compliance that is used to check the violations against\n* `groupBy`: (Only for \"Compliance Violations by Metadata\") The metadata entity type to group violations by\n\n## Important Note:\n* This Widget requires **Development Testing Platform 5.3.3** or higher to work properly.\n",
+        "x": 221,
+        "y": 48.80000305175781,
+        "wires": []
+    },
+    {
+        "id": "e968bf06.9f1ae",
+        "type": "http response",
+        "z": "345530a.12467d",
+        "name": "",
+        "x": 1090,
+        "y": 1040,
+        "wires": []
+    },
+    {
+        "id": "ec4aec2e.bcf96",
+        "type": "function",
+        "z": "345530a.12467d",
+        "name": "Sort Pie Chart Value By Size",
+        "func": "msg.payload.data.sort(function(a,b){\n    return b.value - a.value;\n});\nmsg.payload.tooltip = \"#= dataItem.category # - #=dataItem.value # Violation(s)\";\nmsg.payload.compliance = msg.req.i18n.t('compliance_label',{comp: msg.compliance.name});\nmsg.payload.groupByLabel = msg.req.i18n.t('comp_groupby');\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "x": 900,
+        "y": 1040,
+        "wires": [
+            [
+                "e968bf06.9f1ae"
+            ]
+        ]
+    },
+    {
+        "id": "6809e0c.4d2502",
+        "type": "function",
+        "z": "345530a.12467d",
+        "name": "Map Data to Chart (Priority)",
+        "func": "var violationGroup = msg.violationGroup;\nlet requiredRuleGroupSetId = msg.payload.requiredRuleGroupSetId;\nmsg.payload = {};\nmsg.payload.data =[];\nfor (var key in violationGroup) {\n    msg.key = key;\n  if (violationGroup.hasOwnProperty(key)) {\n    var entry = {\n        category: key,\n        value: violationGroup[key],\n        drilldownUrl: msg.drillDown + \"&groupBy=Priority\" + \"&value=\" + key + \"&requiredRuleGroupSetId=\" + requiredRuleGroupSetId\n    };\n    \n    switch (key) {\n        case \"Not Defined\":\n            entry.color = \"#DDDDDD\";\n            break;\n        case \"Critical\":\n            entry.color = \"#d9534f\";\n            break;\n        case \"High\":\n            entry.color = \"#F09D6E\";\n            break;\n        case \"Medium\":\n            entry.color = \"#f0ad4e\";\n            break;\n        case \"Low\":\n            entry.color = \"#F4D081\";\n            break;\n        case \"Do not show\":\n            entry.color = \"#BDBDBD\";\n            break;\n    }\n    \n    msg.payload.data.push(entry)\n  }\n}\n\nmsg.payload.groupBy = \"Priority\";\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "x": 620,
+        "y": 1000,
+        "wires": [
+            [
+                "ec4aec2e.bcf96"
+            ]
+        ]
+    },
+    {
+        "id": "ddf3fa8a.16d0d8",
+        "type": "function",
+        "z": "345530a.12467d",
+        "name": "Map Data to Chart (Action)",
+        "func": "var violationGroup = msg.violationGroup;\nlet requiredRuleGroupSetId = msg.payload.requiredRuleGroupSetId;\nmsg.payload = {};\nmsg.payload.data =[];\nfor (var key in violationGroup) {\n    msg.key = key;\n  if (violationGroup.hasOwnProperty(key)) {\n    var entry = {\n        category: key,\n        value: violationGroup[key],\n        drilldownUrl: msg.drillDown + \"&groupBy=Action\" + \"&value=\" + key + \"&requiredRuleGroupSetId=\" + requiredRuleGroupSetId\n    };\n    \n     switch (key) {\n        case \"None\":\n            entry.color = \"#DDDDDD\";\n            break;\n        case \"Fix\":\n            entry.color = \"#d9534f\";\n            break;\n        case \"Review\":\n            entry.color = \"#F09D6E\";\n            break;\n        case \"Suppress\":\n            entry.color = \"#BDBDBD\";\n            break;\n        case \"Reassign\":\n            entry.color = \"#F4D081\";\n            break;\n        case \"Other\":\n            entry.color = \"#999999\";\n            break;\n    }\n    \n   msg.payload.data.push(entry)\n  }\n}\n\nmsg.payload.groupBy = \"Action\";\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "x": 620,
+        "y": 1040,
+        "wires": [
+            [
+                "ec4aec2e.bcf96"
+            ]
+        ]
+    },
+    {
+        "id": "e0f30026.28e54",
+        "type": "function",
+        "z": "345530a.12467d",
+        "name": "Map Data to Chart (Risk)",
+        "func": "var violationGroup = msg.violationGroup;\nlet requiredRuleGroupSetId = msg.payload.requiredRuleGroupSetId;\nmsg.payload = {};\nmsg.payload.data =[];\nfor (var key in violationGroup) {\n    msg.key = key;\n  if (violationGroup.hasOwnProperty(key)) {\n    var entry = {\n        category: key,\n        value: violationGroup[key],\n        drilldownUrl: msg.drillDown + \"&groupBy=Risk\" + \"&value=\" + key + \"&requiredRuleGroupSetId=\" + requiredRuleGroupSetId\n    };\n    \n    switch(key){\n        case \"Undefined\":\n            entry.color = \"#DDDDDD\";\n            break;\n        case \"Extreme\":\n            entry.color = \"#d9534f\";\n            break;\n        case \"High\":\n            entry.color = \"#F09D6E\";\n            break;\n        case \"Moderate\":\n            entry.color = \"#f0ad4e\";\n            break;\n        case \"Low\":\n            entry.color = \"#F4D081\";\n            break;\n    }\n    \n   msg.payload.data.push(entry)\n  }\n}\n\nmsg.payload.groupBy = \"Risk\";\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "x": 610,
+        "y": 1080,
+        "wires": [
+            [
+                "ec4aec2e.bcf96"
+            ]
+        ]
+    },
+    {
+        "id": "614d12c7.5fecdc",
+        "type": "switch",
+        "z": "345530a.12467d",
+        "name": "",
+        "property": "payload.groupBy",
+        "propertyType": "msg",
+        "rules": [
+            {
+                "t": "eq",
+                "v": "priorityGroup",
+                "vt": "str"
+            },
+            {
+                "t": "eq",
+                "v": "actionGroup",
+                "vt": "str"
+            },
+            {
+                "t": "eq",
+                "v": "riskGroup",
+                "vt": "str"
+            }
+        ],
+        "checkall": "true",
+        "outputs": 3,
+        "x": 390,
+        "y": 1020,
+        "wires": [
+            [
+                "6809e0c.4d2502"
+            ],
+            [
+                "ddf3fa8a.16d0d8"
+            ],
+            [
+                "e0f30026.28e54"
+            ]
+        ]
+    },
+    {
+        "id": "4573ca7d.f29aa4",
+        "type": "function",
+        "z": "345530a.12467d",
+        "name": "Calculate Data Violations",
+        "func": "var _ = context.global.lodash;\n\nmsg.compliance = _.find(msg.complianceList, {'id': msg.payload.requiredRuleGroupSetId});\nmsg.drillDown = \"/grs/dtp/dashboards/reports/03f72f07-3e46-4bc3-b749-6c59b12129ed\" + \"?filterId=\" + msg.filter.id + \"&targetBuildId=\" + msg.target.encodedId + \"&compliance=\" + encodeURIComponent(msg.compliance.name);\nvar violationGroup= {};\nvar violations = msg.violations.violations;\nvar categoryDetails = msg.categoryDetails;\n\n// Combine category rules into one array\nvar complianceRules = [];\n_.forEach(msg.categoryDetails, function (category) {\n    complianceRules = complianceRules.concat(category.ruleIds);\n});\n\nfunction getComplianceViolations(violations) {\n    var violationsList = violations; // List of violations with rules to search for\n    var compViols = []; // List of compliance-related violations\n    // Go through each rule in the compliance\n    _.forEach(complianceRules, function(rule) {\n         \n        // Given a compliance rule, check our violations list to see if any match\n        for (var i = violationsList.length - 1; i >= 0; i--) {\n            var item = violationsList[i];\n            if(_.isEqual(item.rule.id, rule)) {\n                compViols.push(item); // Found a match, so add violation to compliance violations array\n                violationsList.splice(i, 1);  // Remove violation from list, don't need to search for that one again\n            }\n        }\n    });\n    return compViols;\n}\n\nvar complianceViolations = getComplianceViolations(violations);\n\n// Throw error if no violations exist from the selected compliance\nif(complianceViolations.length === 0) {\n    var message = msg.req.i18n.t(\"comp_pie_no_violations\", {});\n    msg.payload = {\n        error: {\n            title: msg.req.i18n.t(\"comp_pie_no_violations_title\", {}),\n            message: message\n        }\n    };\n    msg.statusCode = 400;\n    return node.error(message, msg);\n}\n\nfor (var i = 0; i < complianceViolations.length; i++) {\n    var violation = complianceViolations[i];\n    var key;\n    if(msg.payload.groupBy == \"priorityGroup\") {\n        key = violation.priority;\n    }\n    else if(msg.payload.groupBy == \"actionGroup\") {\n        key = violation.violationAction;\n    }\n    else if(msg.payload.groupBy == \"riskGroup\") {\n        key = violation.classification;\n    }\n    if(!violationGroup.hasOwnProperty(key)){\n        violationGroup[key] = 0;\n    }\n    violationGroup[key]++;\n}\nmsg.violationGroup = violationGroup;\nmsg.violations = null;\nmsg.complianceViolations = complianceViolations;\nreturn msg;\n",
+        "outputs": 1,
+        "noerr": 0,
+        "x": 190,
+        "y": 1000,
+        "wires": [
+            [
+                "62fe5cd3.99e0a4"
+            ]
+        ]
+    },
+    {
+        "id": "19fd3a70.c4fd56",
+        "type": "DTP REST API",
+        "z": "345530a.12467d",
+        "name": "Get Violations",
+        "requestType": "GET",
+        "endpoint": "/v1.5/staticAnalysisViolations?verbose=false&showFixed=false&filterId={{payload.filterId}}&buildId={{{target.encodedId}}}&details=false&limit=-1{{{groupBy}}}",
+        "input": "payload",
+        "output": "violations",
+        "x": 880,
+        "y": 980,
+        "wires": [
+            [
+                "4573ca7d.f29aa4"
+            ]
+        ]
+    },
+    {
+        "id": "86d25273.912b",
+        "type": "function",
+        "z": "345530a.12467d",
+        "name": "Find build",
+        "func": "var _ = context.global.lodash;\n\nvar builds = msg.builds.builds;\n\n// Find the build.\nvar targetBuild = msg.payload.targetBuild;\nif (targetBuild === 'latestBuild') {\n    // Find the first build that meets the build criteria.\n    msg.target = _.find(builds, msg.buildCriteria);\n} else {\n    msg.target = _.find(builds, _.extend({id: targetBuild}, msg.buildCriteria));\n}\n\n// Check to see if the build does not exist.\nif (_.isUndefined(msg.target)) {\n    if (targetBuild === 'latestBuild') {\n        var message = msg.req.i18n.t('gb_no_build_relevant_data', {\n            filterName: msg.filter.name\n        });\n    } else {\n    var message = msg.req.i18n.t('gb_build_does_not_exist', {\n        buildId: targetBuild,\n        filterName: msg.filter.name\n    });\n}\n    msg.payload = {\n        error: {\n            title: msg.req.i18n.t('gb_invalid_query_param_title', {}),\n            message: message\n        }\n    };\n    msg.statusCode = 400;\n    return node.error(message, msg);\n}\n\nmsg.target.encodedId = encodeURIComponent(msg.target.id);\n\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "x": 680,
+        "y": 940,
+        "wires": [
+            [
+                "75aa2e98.c2c2e"
+            ]
+        ]
+    },
+    {
+        "id": "5f3146dd.fd4008",
+        "type": "function",
+        "z": "345530a.12467d",
+        "name": "Set build criteria and groupBy data",
+        "func": "// Here you can set the criteria that the build must have.\n// By default there is no criteria, but if you wanted to limit\n// the selected build to only builds with coverage data you could\n// set the build criteria as follows:\n// {runTypes: {coverage: {hasDetails: true}}}\nmsg.buildCriteria = {runTypes: {staticAnalysis: {}}};\nif (msg.payload.groupBy === \"Risk\")\n{\n    msg.groupBy = '&classification=' + msg.payload.value;\n}\nelse if (msg.payload.groupBy === \"Action\")\n{\n    msg.groupBy = '&violationAction=' + msg.payload.value;\n}\nelse if (msg.payload.groupBy === \"Priority\")\n{\n    msg.groupBy = '&priority=' + msg.payload.value;\n}\nelse\n{\n    msg.groupBy = \"\";\n}\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "x": 440,
+        "y": 940,
+        "wires": [
+            [
+                "86d25273.912b"
+            ]
+        ]
+    },
+    {
+        "id": "d974ea05.0297f8",
+        "type": "Component",
+        "z": "345530a.12467d",
+        "name": "Compliance Violations by Metadata",
+        "template": "<div class=\"comp-pie-chart-widget\">\n    <div kendo-chart class=\"comp-pie-chart\"\n        k-series=\"series\"\n        k-options=\"options\"\n        k-data-source=\"dataSource\"\n        k-series-defaults=\"seriesDefaults\" ></div>\n    <i ng-if=\"noData\" class=\"comp-pie-chart-no-data fa fa-circle-thin\"></i>\n    <div class=\"comp-labels\">\n        <div class=\"compliance-label\">\n            {{ compliance }}\n        </div>\n        <div class=\"group-by-label\">\n            {{ groupByLabel }} {{ groupBy }}\n        </div>\n    </div>\n</div>",
+        "controller": "$scope.seriesDefaults = { \n    type: 'pie' \n};\n\n$scope.noData =  _.every(data.data, function(item) {\n  return item.value === 0;\n});\n\n$scope.dataSource = data.data;\n$scope.groupBy = data.groupBy;\n$scope.groupByLabel = data.groupByLabel;\n$scope.compliance = data.compliance;\n\n$scope.series = [{\n    padding: 0,\n    field: 'value', \n    categoryField: 'category',\n    overlay: {gradient: 'none'},\n    tooltip: {visible: !!data.tooltip, template: data.tooltip}\n}];\n\n$scope.options = {\n    chartArea: {padding: 0, margin: 5},\n    plotArea: {padding: 0, margin: 0},\n    title: {padding: 0, margin: 0},\n    legend: {visible:$scope.widget.size.x > $scope.widget.size.y},\n    seriesColors: [\n        \"#d9534f\", // Red\n        \"#F09D6E\", // Orange\n        \"#F4D081\", // Yellow\n        \"#95C8A2\", // Green\n        \"#B7D97B\", // Pale Green\n        \"#84BBBC\", // Aqua\n        \"#629CC1\", // Dark Blue\n        \"#CCEBFC\", // Light Blue\n        \"#999999\", // Dark Grey\n        \"#DDDDDD\"  // Grey\n    ],\n    seriesClick: function(e) {\n        var url = e.dataItem.drilldownUrl;\n        if (url) {\n            $window.open(url, '_blank');\n        }\n    }\n};",
+        "styles": ".comp-pie-chart-widget {\n    width: 100%;\n    height: 100%;\n}\n\n.comp-pie-chart {\n    width: 80%;\n    height: 80%;\n    margin: auto;\n}\n\n.comp-pie-chart-no-data {\n    font-size: 140px;\n    position: absolute;\n    margin-left: 24%;\n    font-weight: 100;\n    color: #E9E9E9;\n    top:0;\n}\n\n.comp-labels {\n    text-align: center;\n    font-size: 10px;\n}",
+        "x": 200,
+        "y": 780,
+        "wires": []
+    },
+    {
+        "id": "a6e6bc5c.75526",
+        "type": "Parameters",
+        "z": "345530a.12467d",
+        "name": "Compliance Violations by Metadata",
+        "parameters": "[\n    {\n        \"type\": \"filterDropdown\",\n        \"title\": \"filter\",\n        \"required\": true,\n        \"inheritable\": true\n    },\n    {\n        \"type\": \"targetBuildDropdown\",\n        \"title\": \"Target_Build\",\n        \"required\": true,\n        \"requiredRunTypes\": \"staticAnalysis\",\n        \"inheritable\": true\n    },\n    { \n      \"type\": \"dropdown\", \n      \"title\": \"Compliance\", \n      \"name\": \"requiredRuleGroupSetId\", \n      \"required\": true, \n      \"apiParameter\": \"complianceId\" \n    },\n    {\n        \"type\": \"dropdown\",\n        \"options\": [ {\n                \"label\" : \"Priority\",\n                \"value\" : \"priorityGroup\"\n            },\n            {\n                \"label\" : \"Action\",\n                \"value\" : \"actionGroup\"\n            },\n            {\n                \"label\" : \"Risk\",\n                \"value\" : \"riskGroup\"\n            }\n        ],\n        \"defaultOption\": \"violationPriorityGroup\",\n        \"title\": \"Group by\",\n        \"name\": \"groupBy\",\n        \"required\": true\n    }\n]",
+        "labels": "[\n    {\n        \"name\": \"filter\",\n        \"value\": \"filter\"\n    },\n    {\n        \"name\": \"Target_Build\",\n        \"value\": \"targetBuild\"\n    }\n]",
+        "x": 200,
+        "y": 860,
+        "wires": []
+    },
+    {
+        "id": "edc3a83e.f20b68",
+        "type": "DTP REST API",
+        "z": "345530a.12467d",
+        "name": "Get builds for filter",
+        "requestType": "GET",
+        "endpoint": "/v1.5/builds?filterId={{filter.id}}&buildFields=*",
+        "input": "payload",
+        "output": "builds",
+        "x": 690,
+        "y": 880,
+        "wires": [
+            [
+                "45c41e07.02894"
+            ]
+        ]
+    },
+    {
+        "id": "45c41e07.02894",
+        "type": "DTP REST API",
+        "z": "345530a.12467d",
+        "name": "Get DTP services",
+        "requestType": "GET",
+        "endpoint": "/v1.5/services?relativePath=true",
+        "input": "payload",
+        "output": "services",
+        "x": 890,
+        "y": 880,
+        "wires": [
+            [
+                "68ef436.00e4abc"
+            ]
+        ]
+    },
+    {
+        "id": "d5bc2905.2e5748",
+        "type": "DTP REST API",
+        "z": "345530a.12467d",
+        "name": "Get filter",
+        "requestType": "GET",
+        "endpoint": "/v1.2/filters?filterId={{payload.filterId}}",
+        "input": "payload",
+        "output": "filters",
+        "x": 940,
+        "y": 820,
+        "wires": [
+            [
+                "825d9224.6c2cb"
+            ]
+        ]
+    },
+    {
+        "id": "825d9224.6c2cb",
+        "type": "function",
+        "z": "345530a.12467d",
+        "name": "Ensure filter exists",
+        "func": "var _ = context.global.lodash;\n\n// Check to see if no filters matched the filterId.\nif (_.isEmpty(msg.filters)) {\n    var message = msg.req.i18n.t('gb_filter_does_not_exist', msg.payload);\n    msg.payload = {\n        error: {\n            title: msg.req.i18n.t('gb_invalid_query_param_title', {}),\n            message: message\n        }\n    };\n    msg.statusCode = 400;\n    return node.error(message, msg);\n}\n\nmsg.filter = msg.filters.filters[0];\n\nreturn msg;",
+        "outputs": "1",
+        "noerr": 0,
+        "x": 490,
+        "y": 880,
+        "wires": [
+            [
+                "edc3a83e.f20b68"
+            ]
+        ]
+    },
+    {
+        "id": "322a06ec.485e7a",
+        "type": "Endpoint",
+        "z": "345530a.12467d",
+        "name": "Compliance Violations by Metadata",
+        "uuid": "bbf2cb62-5eb2-45d7-83d8-9fc90d9fef1a",
+        "endpointType": "widget",
+        "category": "compliance10",
+        "sizeX": 1,
+        "sizeY": 1,
+        "scope": [
+            "d974ea05.0297f8",
+            "a6e6bc5c.75526"
+        ],
+        "description": "",
+        "x": 200,
+        "y": 820,
+        "wires": [
+            [
+                "7f11d397.8d323c"
+            ]
+        ]
+    },
+    {
+        "id": "7f11d397.8d323c",
+        "type": "change",
+        "z": "345530a.12467d",
+        "name": "Set Widget mode",
+        "rules": [
+            {
+                "t": "set",
+                "p": "mode",
+                "pt": "msg",
+                "to": "widget",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 490,
+        "y": 820,
+        "wires": [
+            [
+                "c073a11e.574cc"
+            ]
+        ]
+    },
+    {
+        "id": "c073a11e.574cc",
+        "type": "function",
+        "z": "345530a.12467d",
+        "name": "Check for missing parameters",
+        "func": "var _ = context.global.lodash;\n\nif (msg.mode === 'report') {\n    if (!_.isUndefined(msg.payload.targetBuildId)) {\n        msg.payload.targetBuild = msg.payload.targetBuildId;\n        delete msg.payload.targetBuildId; // Remove from payload since we don't need it\n    }\n}\n\n// Check for a missing filterId.\nif (_.isUndefined(msg.payload.filterId)) {\n    var message = msg.req.i18n.t('gb_missing_query_param', {param: 'filterId'});\n    msg.payload = {\n        error: {\n            title: msg.req.i18n.t('gb_missing_query_param_title', {}),\n            message: message\n        }\n    };\n    msg.statusCode = 400;\n    return node.error(message, msg);\n}\n\n// Check for a missing targetBuild.\nif (_.isUndefined(msg.payload.targetBuild)) {\n    var message = msg.req.i18n.t('gb_missing_query_param', {param: 'targetBuild'});\n    msg.payload = {\n        error: {\n            title: msg.req.i18n.t('gb_missing_query_param_title', {}),\n            message: message\n        }\n    };\n    msg.statusCode = 400;\n    return node.error(message, msg);\n}\n\n// Check for missing requiredRuleGroupSetId\nif (_.isUndefined(msg.payload.requiredRuleGroupSetId)) {\n    var message = msg.req.i18n.t('gb_missing_query_param', {param: 'requiredRuleGroupSetId'});\n    msg.payload = {\n        error: {\n            title: msg.req.i18n.t('gb_missing_query_param_title', {}),\n            message: message\n        }\n    };\n    msg.statusCode = 400;\n    return node.error(message, msg);\n}\n\n// Check for missing groupBy\nif (_.isUndefined(msg.payload.groupBy)) {\n    var message = msg.req.i18n.t('gb_missing_query_param', {param: 'groupBy'});\n    msg.payload = {\n        error: {\n            title: msg.req.i18n.t('gb_missing_query_param_title', {}),\n            message: message\n        }\n    };\n    msg.statusCode = 400;\n    return node.error(message, msg);\n}\n\n// Format build id if build information is coming from a widget\nif (msg.mode === 'widget') {\n    // If the targetBuild begins with 'buildId:', strip it out\n    if (_.startsWith(msg.payload.targetBuild, \"buildId:\")) {\n        msg.payload.targetBuild = msg.payload.targetBuild.substring(8);\n    }\n}\n\nreturn msg;",
+        "outputs": "1",
+        "noerr": 0,
+        "x": 730,
+        "y": 820,
+        "wires": [
+            [
+                "d5bc2905.2e5748"
+            ]
+        ]
+    },
+    {
+        "id": "75aa2e98.c2c2e",
+        "type": "DTP REST API",
+        "z": "345530a.12467d",
+        "name": "Get Compliance Details",
+        "requestType": "GET",
+        "endpoint": "/v1/rules/ruleGroupSets/{{payload.requiredRuleGroupSetId}}/ruleGroups",
+        "input": "payload",
+        "output": "categoryDetails",
+        "x": 910,
+        "y": 940,
+        "wires": [
+            [
+                "19fd3a70.c4fd56"
+            ]
+        ]
+    },
+    {
+        "id": "c16531eb.c9f92",
+        "type": "Endpoint",
+        "z": "345530a.12467d",
+        "name": "Compliance Violations by Metadata Report",
+        "uuid": "03f72f07-3e46-4bc3-b749-6c59b12129ed",
+        "endpointType": "report",
+        "category": "custom",
+        "sizeX": 1,
+        "sizeY": 1,
+        "scope": [
+            "51a8b597.6518fc",
+            "1301da3b.ce6926"
+        ],
+        "description": "",
+        "x": 220,
+        "y": 700,
+        "wires": [
+            [
+                "7491c791.0caf28"
+            ]
+        ]
+    },
+    {
+        "id": "51a8b597.6518fc",
+        "type": "Component",
+        "z": "345530a.12467d",
+        "name": "Compliance Violations by Metadata Report",
+        "template": "<div>\n    <div class=\"complianceViolationByMetadataReportGroupByValueFilterDropDown\"> Group By Value: <select kendo-drop-down-list k-options=\"dropDownOptions\" ng-model=\"groupByValue\" ng-change=\"filterResults()\">\n        </select>\n    </div>    \n    <div kendo-grid k-data-source=\"dataSource\" options=\"mainGridOptions\" k-rebind=\"dataSource\"></div>\n</div>",
+        "controller": "if(data)\n{\n    $scope.groupByValue = data.groupByValue;\n    $scope.compliance = data.compliance;\n    $scope.filterId = data.filterId;\n    $scope.groupBy = data.groupBy;\n    $scope.requiredRuleGroupSetId = data.requiredRuleGroupSetId;\n    $scope.value = data.value;\n    $scope.targetBuildId = data.targetBuildId;\n    $scope.tableData = data.data;\n    $scope.config = data.config;\n    $scope.more = Parasoft.i18n.more;\n    $scope.limit = data.data.length;\n    if(data.pageOptions) {\n        $scope.pageOptions = data.pageOptions;\n    }\n    \n    $scope.dataSource = new kendo.data.DataSource({\n        data: filterGroupByValue(data.data, data.groupByValue),\n        pageSize: 25\n    });\n    $scope.dropDownOptions = {\n        dataSource: data.dropDownData,\n        dataTextField: \"value\",\n        dataValueField: \"value\",\n        value: data.groupByValue\n    };\n}\n\n$scope.filterResults = function filterResults() {\n    /*$scope.dataSource = new kendo.data.DataSource({\n        data: filterGroupByValue($scope.tableData, $scope.groupByValue),\n        pageSize: 25\n    });*/\n    window.location = './reports/03f72f07-3e46-4bc3-b749-6c59b12129ed?filterId=' + $scope.filterId + '&targetBuildId=' + $scope.targetBuildId + '&compliance=' + $scope.compliance + '&groupBy=' + $scope.groupBy + '&value=' + $scope.groupByValue + '&requiredRuleGroupSetId=' + $scope.requiredRuleGroupSetId;\n};\n\nfunction filterGroupByValue(data, groupByValue) {\n    let groupByData = [];\n    let uniqueViolations = [];\n    for (let i = 0; i < data.length; i++)\n    {\n        if (data[i].groupByValue === groupByValue)\n        {\n            if (uniqueViolations[data[i].ruleId])\n            {\n                uniqueViolations[data[i].ruleId].violationCount++;\n            }\n            else\n            {\n                data[i].violationCount = 1;\n                uniqueViolations[data[i].ruleId] = data[i];\n            }\n        }\n    }\n    for (let i = 0; i < data.length; i++)\n    {\n        if (uniqueViolations[data[i].ruleId])\n        {\n            groupByData.push(uniqueViolations[data[i].ruleId]);\n            uniqueViolations[data[i].ruleId] = null;\n        }\n    }\n    return groupByData;\n}\n    \n\nvar pageOptions = {\n        refresh: false,\n        buttonCount: 5,\n        pageSizes: [25, 50, 100, 250],\n        messages: {\n            display: '{0} - {1} / {2} ' + Parasoft.i18n.items,\n            empty: Parasoft.i18n.no_data,\n            itemsPerPage: Parasoft.i18n.items_per_page,\n            first: Parasoft.i18n.nav_go_to_first_page_tooltip_res,\n            last: Parasoft.i18n.nav_go_to_last_page_tooltip_res,\n            next: Parasoft.i18n.nav_go_to_next_page_tooltip_res,\n            previous: Parasoft.i18n.nav_go_to_previous_page_tooltip_res,\n            refresh: Parasoft.i18n.refresh,\n            morePages: Parasoft.i18n.more_pages\n        }\n    };\n\n$scope.mainGridOptions = {\n    columns: $scope.config,\n    scrollable: false,\n    //If widget instance, do not apply page options.\n    //Else, apply user's page options if available, otherwise use default page options specified here\n    pageable: $scope.widget ? false : $scope.pageOptions ? $scope.pageOptions : pageOptions\n};",
+        "styles": ".complianceViolationByMetadataReportGroupByValueFilterDropDown {\n    text-align: center;\n    margin-bottom: 15px;\n    font-size: 11px;\n}\n\n.table-widget table tbody tr td {\n    border: 1px solid #e4e4e4;\n    line-height: 11px;\n    font-size: 11px;\n}\n\n\n.k-chart {\n    margin-left: -5px;\n}\n\n.k-grid td {\n    padding-top: 0em;\n    padding-right: 0.6em;\n    padding-left: 0.6em;\n    padding-bottom: 0em;\n    overflow: hidden;\n    text-overflow: ellipsis;\n    white-space: nowrap;\n    font-size: 11px;\n    height: 25px;\n}\n\n\n.k-grid tr {\n    padding-top: 0em;\n    padding-right: 0.6em;\n    padding-left: 0.6em;\n    padding-bottom: 0em;\n    overflow: hidden;\n    text-overflow: ellipsis;\n    white-space: nowrap;\n    font-size: 11px;\n    height: 25px;\n}\n\n.k-label {\n    font-size: 11px;\n}\n\n.k-link {\n    font-size: 11px;\n}",
+        "x": 220,
+        "y": 660,
+        "wires": []
+    },
+    {
+        "id": "7491c791.0caf28",
+        "type": "change",
+        "z": "345530a.12467d",
+        "name": "Set Report mode",
+        "rules": [
+            {
+                "t": "set",
+                "p": "mode",
+                "pt": "msg",
+                "to": "report",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 490,
+        "y": 700,
+        "wires": [
+            [
+                "c073a11e.574cc"
+            ]
+        ]
+    },
+    {
+        "id": "b04c16e6.3333c8",
+        "type": "http response",
+        "z": "345530a.12467d",
+        "name": "",
+        "x": 1050,
+        "y": 1160,
+        "wires": []
+    },
+    {
+        "id": "68ef436.00e4abc",
+        "type": "DTP REST API",
+        "z": "345530a.12467d",
+        "name": "Get compliance list",
+        "requestType": "GET",
+        "endpoint": "/v1/dashboard/parameters/compliance",
+        "input": "payload",
+        "output": "complianceList",
+        "x": 170,
+        "y": 940,
+        "wires": [
+            [
+                "5f3146dd.fd4008"
+            ]
+        ]
+    },
+    {
+        "id": "1301da3b.ce6926",
+        "type": "Parameters",
+        "z": "345530a.12467d",
+        "name": "Compliance Violations by Metadata Report",
+        "parameters": "[]",
+        "labels": "[\n    {\n        \"name\": \"filter\",\n        \"value\": \"filter\"\n    },\n    {\n        \"name\": \"Target_Build\",\n        \"value\": \"targetBuild\"\n    },\n    {\n        \"name\": \"Compliance\",\n        \"value\": \"compliance\"\n    },\n    {\n        \"name\": \"Group By\",\n        \"value\": \"groupBy\"\n    }\n]",
+        "x": 220,
+        "y": 740,
+        "wires": []
+    },
+    {
+        "id": "f1d80805.1e3198",
+        "type": "function",
+        "z": "345530a.12467d",
+        "name": "Set category colors",
+        "func": "var _ = context.global.lodash;\n\nvar categoryDetails = msg.categoryDetails;\n\nvar colors = [\n        \"#0c81c5\",\n        \"#9e0a61\",\n        \"#449000\",\n        \"#76b800\",\n        \"#ffae00\",\n        \"#ef4c00\",\n        \"#871414\"\n    ];\n\nfor (var i = 0; i < categoryDetails.length; i++) {\n    categoryDetails[i].color = getColor(i, colors.length);\n}\n\nfunction getColor(index, arrayLength) {\n    var indexOfColor = index;\n    // Adjust index to be in bounds of colors array\n    while (indexOfColor >= arrayLength) {\n        indexOfColor = indexOfColor - arrayLength;\n    }\n    // Index in range, get color\n    return colors[indexOfColor];\n}\n\nmsg.categoryDetails = categoryDetails;\n\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "x": 1030,
+        "y": 440,
+        "wires": [
+            [
+                "713019c8.6806e8"
+            ]
+        ]
+    },
+    {
+        "id": "aeaed29b.fb832",
+        "type": "function",
+        "z": "345530a.12467d",
+        "name": "Response Table (Risk)",
+        "func": "let _ = context.global.lodash;\nlet data = [];\nfor (let i = 0; i < msg.complianceViolations.length; i++)\n{\n    let uniqueViolation = {};\n    uniqueViolation.ruleId = msg.complianceViolations[i].rule.id;\n    uniqueViolation.ruleDescription = msg.complianceViolations[i].description;\n    uniqueViolation.violationCount = 1;\n    uniqueViolation.drillDownURL = msg.services.services.violationsExplorer + '?filterId=' + msg.filter.id + '&buildId=' + msg.target.id + '&rule=' + uniqueViolation.ruleId + '&riskImpact=' + msg.complianceViolations[i].classification;\n    uniqueViolation.groupByValue = msg.complianceViolations[i].classification;\n    data.push(uniqueViolation);\n}\n\n\nlet dropDownData = [];\nfor (let i = 0; i < msg.metadata.entities.length; i++)\n{\n    let metaData = {value: msg.metadata.entities[i].name};\n    dropDownData.push(metaData);\n}\n\nmsg.payload = {\n    config: [\n         {\n            title: 'Rule ID',\n            field: 'ruleId',\n            template: '#=ruleId#'\n        },\n        {\n            title: 'Rule Description',\n            field: 'ruleDescription',\n            template: '<kendo-tooltip k-options=\"tooltipOptions\">#=ruleDescription#</kendo-tooltip>'\n        },\n        {\n            title: 'Violation Count',\n            field: ['violationCount', 'drillDownURL'],\n            template: '<span><a href=\"#=drillDownURL#\" target=\"_blank\">#=violationCount#</a></span>'\n        }\n    ],\n    'groupByValue' : msg.payload.value,\n    'filterId': msg.payload.filterId,\n    'targetBuildId': msg.payload.targetBuild,\n    'compliance': msg.payload.compliance,\n    'dropDownData' : dropDownData,\n    'requiredRuleGroupSetId' : msg.payload.requiredRuleGroupSetId,\n    'groupBy' : msg.payload.groupBy,\n    'data': data\n};\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "x": 600,
+        "y": 1200,
+        "wires": [
+            [
+                "b04c16e6.3333c8"
+            ]
+        ]
+    },
+    {
+        "id": "62fe5cd3.99e0a4",
+        "type": "switch",
+        "z": "345530a.12467d",
+        "name": "Is Not Report Mode",
+        "property": "mode",
+        "propertyType": "msg",
+        "rules": [
+            {
+                "t": "neq",
+                "v": "report",
+                "vt": "str"
+            },
+            {
+                "t": "else"
+            }
+        ],
+        "checkall": "true",
+        "outputs": 2,
+        "x": 170,
+        "y": 1040,
+        "wires": [
+            [
+                "614d12c7.5fecdc"
+            ],
+            [
+                "54ea7b40.8a31b4"
+            ]
+        ]
+    },
+    {
+        "id": "54ea7b40.8a31b4",
+        "type": "switch",
+        "z": "345530a.12467d",
+        "name": "",
+        "property": "payload.groupBy",
+        "propertyType": "msg",
+        "rules": [
+            {
+                "t": "eq",
+                "v": "Priority",
+                "vt": "str"
+            },
+            {
+                "t": "eq",
+                "v": "Action",
+                "vt": "str"
+            },
+            {
+                "t": "eq",
+                "v": "Risk",
+                "vt": "str"
+            }
+        ],
+        "checkall": "true",
+        "outputs": 3,
+        "x": 110,
+        "y": 1160,
+        "wires": [
+            [
+                "277b63c9.723cec"
+            ],
+            [
+                "5efdaf75.54097"
+            ],
+            [
+                "75307372.d3f6ec"
+            ]
+        ]
+    },
+    {
+        "id": "22eafa80.37b536",
+        "type": "function",
+        "z": "345530a.12467d",
+        "name": "Response Table (Action)",
+        "func": "let _ = context.global.lodash;\nlet data = [];\nfor (let i = 0; i < msg.complianceViolations.length; i++)\n{\n    let uniqueViolation = {};\n    uniqueViolation.ruleId = msg.complianceViolations[i].rule.id;\n    uniqueViolation.ruleDescription = msg.complianceViolations[i].description;\n    uniqueViolation.violationCount = 1;\n    uniqueViolation.drillDownURL = msg.services.services.violationsExplorer + '?filterId=' + msg.filter.id + '&buildId=' + msg.target.id + '&rule=' + uniqueViolation.ruleId + '&action=' + msg.complianceViolations[i].violationAction;\n    uniqueViolation.groupByValue = msg.complianceViolations[i].violationAction;\n    data.push(uniqueViolation);\n}\n\n\nlet dropDownData = [];\nfor (let i = 0; i < msg.metadata.entities.length; i++)\n{\n    let metaData = {value: msg.metadata.entities[i].name};\n    dropDownData.push(metaData);\n}\n\nmsg.payload = {\n    config: [\n         {\n            title: 'Rule ID',\n            field: 'ruleId',\n            template: '#=ruleId#'\n        },\n        {\n            title: 'Rule Description',\n            field: 'ruleDescription',\n            template: '<kendo-tooltip k-options=\"tooltipOptions\">#=ruleDescription#</kendo-tooltip>'\n        },\n        {\n            title: 'Violation Count',\n            field: ['violationCount', 'drillDownURL'],\n            template: '<span><a href=\"#=drillDownURL#\" target=\"_blank\">#=violationCount#</a></span>'\n        }\n    ],\n    'groupByValue' : msg.payload.value,\n    'filterId': msg.payload.filterId,\n    'targetBuildId': msg.payload.targetBuild,\n    'compliance': msg.payload.compliance,\n    'dropDownData' : dropDownData,\n    'requiredRuleGroupSetId' : msg.payload.requiredRuleGroupSetId,\n    'groupBy' : msg.payload.groupBy,\n    'data': data\n};\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "x": 610,
+        "y": 1160,
+        "wires": [
+            [
+                "b04c16e6.3333c8"
+            ]
+        ]
+    },
+    {
+        "id": "e2333d00.19249",
+        "type": "function",
+        "z": "345530a.12467d",
+        "name": "Response Table (Priority)",
+        "func": "let _ = context.global.lodash;\nlet data = [];\nfor (let i = 0; i < msg.complianceViolations.length; i++)\n{\n    let uniqueViolation = {};\n    uniqueViolation.ruleId = msg.complianceViolations[i].rule.id;\n    uniqueViolation.ruleDescription = msg.complianceViolations[i].description;\n    uniqueViolation.violationCount = 1;\n    uniqueViolation.drillDownURL = msg.services.services.violationsExplorer + '?filterId=' + msg.filter.id + '&buildId=' + msg.target.id + '&rule=' + uniqueViolation.ruleId + '&priority=' + msg.complianceViolations[i].priority;\n    uniqueViolation.groupByValue = msg.complianceViolations[i].priority;\n    data.push(uniqueViolation);\n}\n\nlet dropDownData = [];\nfor (let i = 0; i < msg.metadata.entities.length; i++)\n{\n    let metaData = {value: msg.metadata.entities[i].name};\n    dropDownData.push(metaData);\n}\n\nmsg.payload = {\n    config: [\n         {\n            title: 'Rule ID',\n            field: 'ruleId',\n            template: '#=ruleId#'\n        },\n        {\n            title: 'Rule Description',\n            field: 'ruleDescription',\n            template: '<kendo-tooltip k-options=\"tooltipOptions\">#=ruleDescription#</kendo-tooltip>'\n        },\n        {\n            title: 'Violation Count',\n            field: ['violationCount', 'drillDownURL'],\n            template: '<span><a href=\"#=drillDownURL#\" target=\"_blank\">#=violationCount#</a></span>'\n        }\n    ],\n    'groupByValue' : msg.payload.value,\n    'filterId': msg.payload.filterId,\n    'targetBuildId': msg.payload.targetBuild,\n    'compliance': msg.payload.compliance,\n    'dropDownData' : dropDownData,\n    'requiredRuleGroupSetId' : msg.payload.requiredRuleGroupSetId,\n    'groupBy' : msg.payload.groupBy,\n    'data': data\n};\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "x": 610,
+        "y": 1120,
+        "wires": [
+            [
+                "b04c16e6.3333c8"
+            ]
+        ]
+    },
+    {
+        "id": "277b63c9.723cec",
+        "type": "DTP REST API",
+        "z": "345530a.12467d",
+        "name": "Get Priority Metadata Values",
+        "requestType": "GET",
+        "endpoint": "/v1.2/metadata/priority",
+        "input": "payload",
+        "output": "metadata",
+        "x": 320,
+        "y": 1120,
+        "wires": [
+            [
+                "e2333d00.19249"
+            ]
+        ]
+    },
+    {
+        "id": "5efdaf75.54097",
+        "type": "DTP REST API",
+        "z": "345530a.12467d",
+        "name": "Get Action Metadata Values",
+        "requestType": "GET",
+        "endpoint": "/v1.2/metadata/violationAction",
+        "input": "payload",
+        "output": "metadata",
+        "x": 320,
+        "y": 1160,
+        "wires": [
+            [
+                "22eafa80.37b536"
+            ]
+        ]
+    },
+    {
+        "id": "75307372.d3f6ec",
+        "type": "DTP REST API",
+        "z": "345530a.12467d",
+        "name": "Get RiskImpact Metadata Values",
+        "requestType": "GET",
+        "endpoint": "/v1.2/metadata/classification",
+        "input": "payload",
+        "output": "metadata",
+        "x": 340,
+        "y": 1200,
+        "wires": [
+            [
+                "aeaed29b.fb832"
+            ]
+        ]
+    }
+]

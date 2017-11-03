@@ -1,0 +1,27 @@
+:host h1 {
+  color: white;
+  text-align: center;
+}
+:host p {
+  color: orange;
+  padding: 10px;
+}
+:host ul {
+  border: 3px solid orange;
+  padding: 10px;
+  text-align: left;
+  background-color: rgba(000,000,000,0.7);
+}
+
+:host li {
+	list-style: none;
+	border: 1px solid orange;
+}
+
+:host .author {
+	margin-right: 10px;
+}
+
+:host reddit-container {
+    display: inline-block;
+}
